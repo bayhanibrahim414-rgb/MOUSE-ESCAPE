@@ -6,7 +6,12 @@
 <meta name="theme-color" content="#0b1020">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mouse Escape">
 <title>Mouse Escape</title>
+
+<!-- Ana ekran ve sekme ikonu (Script ile hareketli logodaki fare görseli otomatik atanır) -->
+<link id="appAppleIcon" rel="apple-touch-icon" sizes="180x180" href="">
+<link id="appFavicon" rel="icon" type="image/png" href="">
 
 <style>
     * {
@@ -1015,6 +1020,51 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    /* ANA EKRAN VE FAVICON İKONUNU LOGODAKİ FARE GÖRSELİ YAP */
+    (function applyLogoMouseAsAppIcon() {
+        const size = 512;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+
+        // İkon arka planı (oyun temasına uyumlu koyu lacivert degrade)
+        const bgGrad = ctx.createLinearGradient(0, 0, size, size);
+        bgGrad.addColorStop(0, "#1e293b");
+        bgGrad.addColorStop(1, "#090d18");
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, size, size);
+
+        // Hafif mavi parlama efekti
+        const glow = ctx.createRadialGradient(size * 0.5, size * 0.45, 20, size * 0.5, size * 0.5, size * 0.48);
+        glow.addColorStop(0, "rgba(59, 130, 246, 0.35)");
+        glow.addColorStop(1, "rgba(59, 130, 246, 0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, size, size);
+
+        // Hareketli logodaki fare SVG'sini PNG'ye çevir ve ekle
+        const rawMouseSvg = PLAYER_SKINS.mouse.svg.trim().replace(
+            "<svg ",
+            '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" '
+        );
+        const svgBlob = new Blob([rawMouseSvg], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+
+        img.onload = () => {
+            const pad = 54;
+            ctx.drawImage(img, pad, pad, size - pad * 2, size - pad * 2);
+            URL.revokeObjectURL(url);
+
+            const pngDataUrl = canvas.toDataURL("image/png");
+            const appleIcon = document.getElementById("appAppleIcon");
+            const favIcon = document.getElementById("appFavicon");
+            if (appleIcon) appleIcon.href = pngDataUrl;
+            if (favIcon) favIcon.href = pngDataUrl;
+        };
+        img.src = url;
+    })();
+
     /* DOM REFERANSLARI */
 
     const screens = {
@@ -1322,14 +1372,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         musicStep = 0;
 
-        // Gerilim ve kalp atışı hissi veren minör/kromatik dizi
         const bassPattern = [110, 110, 130.81, 116.54, 110, 110, 146.83, 138.59];
         const leadPattern = [440, 466.16, 523.25, 466.16, 440, 392, 415.30, 466.16];
 
         function scheduleNextBeat() {
             if (!gameRunning || !musicEnabled) return;
 
-            // Seviye, takipçi sayısı ve hıza bağlı olarak tempo hızlanır
             const enemyFactor = Math.min(enemies.length, 32) / 32;
             const levelFactor = Math.min(level - 1, 8) / 8;
             const timeFactor = Math.min(elapsedSeconds / 180, 1);
@@ -1337,7 +1385,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const intensity = Math.min(1, levelFactor * 0.45 + enemyFactor * 0.35 + timeFactor * 0.2 + dangerBoost);
 
-            // Başlangıç ~290ms -> Maksimum hızda ~105ms (çok gergin ve hızlı!)
             const stepDelay = Math.max(102, Math.round(290 - intensity * 185));
             const pitchShift = 1 + intensity * 0.22;
 
@@ -1345,7 +1392,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 initAudio();
                 const now = audioContext.currentTime;
 
-                // Gergin bas / nabız sesi
                 const bassOsc = audioContext.createOscillator();
                 const bassGain = audioContext.createGain();
                 bassOsc.type = intensity > 0.45 ? "sawtooth" : "triangle";
@@ -1363,7 +1409,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 bassOsc.start(now);
                 bassOsc.stop(now + noteDur + 0.01);
 
-                // Seviye arttıkça veya tehlike yaklaşınca tiz stres arpeji eklenir
                 if (intensity > 0.15 || musicStep % 2 === 1) {
                     const leadOsc = audioContext.createOscillator();
                     const leadGain = audioContext.createGain();
@@ -1615,13 +1660,11 @@ document.addEventListener("DOMContentLoaded", () => {
         elapsedSeconds = (now - startTime) / 1000;
         timeText.textContent = formatTime(elapsedSeconds);
 
-        // Her 30 saniyede bir seviye atla ve takipçileri çoğalt
         const newLevel = Math.floor(elapsedSeconds / 30) + 1;
         if (newLevel > level) {
             levelUp();
         }
 
-        // Oyuncuyu yumuşak şekilde hedefe taşı
         const followSpeed = 0.24;
         const moveX = (player.targetX - player.x) * followSpeed;
         const moveY = (player.targetY - player.y) * followSpeed;
@@ -1659,7 +1702,6 @@ document.addEventListener("DOMContentLoaded", () => {
             let vx = (dx / safeDistance) * speed;
             let vy = (dy / safeDistance) * speed;
 
-            // Takipçilerin üst üste binip tek görünmesini önleyen hafif ayrışma kuvveti
             for (let j = 0; j < enemies.length; j++) {
                 if (i === j) continue;
                 const other = enemies[j];
